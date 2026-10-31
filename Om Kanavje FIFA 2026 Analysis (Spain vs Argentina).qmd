@@ -1,0 +1,397 @@
+---
+title: "Sports EDA Project"
+author: "Om Kanavje"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(corrplot)
+```
+
+```{r}
+Argentina<-read_excel("C:/Users/OM/Downloads/archive (6)/Data.xlsx",sheet=1)
+Spain<-read_excel("C:/Users/OM/Downloads/archive (6)/Data.xlsx",sheet=2)
+```
+
+```{r}
+str(Argentina)
+str(Spain)
+dim(Argentina)
+dim(Spain)
+summary(Argentina)
+summary(Spain)
+```
+
+```{r}
+Goals_Scored_Argentina<- Argentina |>
+  separate(Score, into = c("Goals_Scored", "Goals_Conceded"), sep = "–", convert = TRUE)
+
+Goals_Scored_Spain<- Spain |>
+  separate(Score, into = c("Goals_Scored", "Goals_Conceded"), sep = "–", convert = TRUE)
+
+Avg_Goals_Argentina<- mean(Goals_Scored_Argentina$Goals_Scored, na.rm = TRUE)
+Avg_Goals_Spain<- mean(Goals_Scored_Spain$Goals_Scored, na.rm = TRUE)
+
+all_Goals_Avg <- data.frame(
+  Team = c("Argentina", "Spain"),
+  Avg_Goals = c(Avg_Goals_Argentina, Avg_Goals_Spain)
+)
+```
+
+```{r}
+#Q1.Comparison of Average Goals
+bp <- barplot(
+  all_Goals_Avg$Avg_Goals,
+  names.arg = all_Goals_Avg$Team,
+  col = c("Blue", "Red"),
+  main = "Average Goals Scored over the past Matches",
+  ylab = "Average Goals",
+  ylim = c(0, 3.5)
+)
+
+text(x = bp, y = all_Goals_Avg$Avg_Goals + 0.15,
+     labels = round(all_Goals_Avg$Avg_Goals, 2), font = 2)
+```
+
+Here, A barplot is created showing the average goals by each team over the past matches.\
+\
+Argentina showed a high average of goals nearly 3 goals per game (19 goals across 7 matches).This indicates a highly explosive, high-scoring attacking style that consistently breaks through opposition defenses, even in tight extra-time matches (ex : against Switzerland and Cabo Verde).
+
+Spain averaged under 2 goals per match (13 goals across 7 matches).This reflects a controlled, tactical approach focused on possession and efficiency rather than overwhelming scorelines (ex : controlled 1–0 wins against Portugal and Uruguay).
+
+```{r}
+#Q2.Comparing Goals Scored and Conceded to understand Strategy
+all_Goals_Avg$Avg_Conceded <- c(
+  mean(Goals_Scored_Argentina$Goals_Conceded, na.rm = TRUE),
+  mean(Goals_Scored_Spain$Goals_Conceded, na.rm = TRUE)
+)
+
+barplot(t(as.matrix(all_Goals_Avg[, 2:3])), beside = TRUE, 
+        names.arg = all_Goals_Avg$Team, col = c("blue", "red"),
+        main = "Goals Scored vs Conceded", 
+        legend.text = c("Scored", "Conceded"))
+```
+
+Argentina:\
+Scored: Average of 2.71 Goals per Match\
+Conceded: Average of 1 Goal per Match\
+Highly dynamic, high-scoring games,strong attack, but vulnerable enough to concede an average of a goal per match.
+
+Spain:\
+Scored: Average of 1.86 Goals per Match\
+Conceded: Average of 0.14 Goal per Match\
+Exceptionally disciplined defense,harder to score against, keeping opponents to near-zero goals while maintaining a steady output.
+
+Argentina relies on overwhelming offensive output, outscoring opponents in higher-scoring fixtures.\
+Spain controls matches through strong defensive stability, conceding almost no goals while maintaining control.
+
+```{r}
+#Q3.Goal Difference and match efficiency of Argentina
+
+Net_Goals_Scored_Argentina <- Goals_Scored_Argentina |>
+  mutate(Goal_Diff = Goals_Scored - Goals_Conceded)
+
+Net_Goals_Scored_Spain <- Goals_Scored_Spain |>
+  mutate(Goal_Diff = Goals_Scored - Goals_Conceded)
+
+# Line Chart for Argentina's Goal Margin Trajectory
+plot(
+  1:nrow(Net_Goals_Scored_Argentina), 
+  Net_Goals_Scored_Argentina$Goal_Diff, 
+  type = "o", 
+  col = "skyblue", 
+  pch = 19, 
+  lwd = 3, 
+  cex = 1.5,
+  ylim = c(0, 4),
+  xlab = "Match Progression", 
+  ylab = "Goal Difference (Scored - Conceded)",
+  main = "Argentina Match-by-Match Margin Trajectory",
+  xaxt = "n"
+)
+
+axis(1, at = 1:7, labels = paste("Match", 1:7))
+
+grid()
+text(
+  1:7, 
+  Net_Goals_Scored_Argentina$Goal_Diff + 0.25, 
+  labels = Net_Goals_Scored_Argentina$Goal_Diff, 
+  font = 2, 
+  col = "darkblue"
+)
+```
+
+Argentina maintained high offensive control throughout the tournament, never allowing a negative goal difference (\<0) or even a draw (0).Argentina won all the matches.
+
+```{r}
+#Q3.Goal Difference and match efficiency of Spain
+
+# Line Chart for Spain's Goal Margin Trajectory
+plot(
+  1:nrow(Net_Goals_Scored_Spain), 
+  Net_Goals_Scored_Spain$Goal_Diff, 
+  type = "o", 
+  col = "darkred", 
+  pch = 17, 
+  lwd = 3, 
+  cex = 1.5,
+  ylim = c(0, 5),
+  xlab = "Match Progression", 
+  ylab = "Goal Difference (Scored - Conceded)",
+  main = "Spain Match-by-Match Margin Trajectory",
+  xaxt = "n"
+)
+
+axis(1, at = 1:7, labels = paste("Match", 1:7))
+
+grid()
+text(
+  1:7, 
+  Net_Goals_Scored_Spain$Goal_Diff + 0.3, 
+  labels = Net_Goals_Scored_Spain$Goal_Diff, 
+  font = 2, 
+  col = "darkred"
+)
+```
+
+Just like Argentina, Spain was also unbeaten in goal difference per match.They did have one match with 0 margin suggesting a draw.
+
+Argentina maintained a baseline margin of at least +1 in every single game.\
+Spain had a slower start ($0$ margin in Match 1), but achieved a higher single-game peak margin (+4 in Match 2 compared to Argentina's highest of +3).
+
+```{r}
+# Q4. Stage-wise Goals Scored Comparison
+Goals_Scored_Argentina <- Goals_Scored_Argentina |>
+  mutate(Stage = ifelse(grepl("Group", Round, ignore.case=TRUE),
+                        "Group Stage", "Knockout"))
+
+Goals_Scored_Spain <- Goals_Scored_Spain |>
+  mutate(Stage = ifelse(grepl("Group", Round, ignore.case=TRUE),
+                        "Group Stage", "Knockout"))
+
+stage_avg <- bind_rows(
+  Goals_Scored_Argentina |> group_by(Stage) |>
+    summarise(Avg_Scored = mean(Goals_Scored),
+              Team = "Argentina"),
+  Goals_Scored_Spain |> group_by(Stage) |> 
+    summarise(Avg_Scored = mean(Goals_Scored),
+              Team = "Spain")
+)
+
+stage_matrix <- xtabs(Avg_Scored ~ Team + Stage,
+                      data = stage_avg)
+
+bp_stage <- barplot(
+  stage_matrix,
+  beside = TRUE,
+  col = c("skyblue", "darkred"),
+  main = "Average Goals Scored: Group Stage vs Knockouts",
+  ylab = "Average Goals",
+  ylim = c(0, 4)
+)
+legend("topright", legend = c("Argentina", "Spain"),
+       fill = c("skyblue", "darkred"))
+text(x = bp_stage, y = stage_matrix + 0.15, 
+     labels = round(stage_matrix, 2), font = 2)
+```
+
+Argentina maintained remarkably consistent offensive pressure, averaging high goal outputs across both group games and high-stakes knockout rounds.\
+Spain scored heavily in the group stage due to outlier matches, but tightened up significantly in knockout rounds to favor low-scoring defensive control.
+
+```{r}
+# Q5. Clean Sheet Rates
+cs_argentina <- mean(Goals_Scored_Argentina$Goals_Conceded == 0,
+                     na.rm = TRUE) * 100
+cs_spain <- mean(Goals_Scored_Spain$Goals_Conceded == 0,
+                 na.rm = TRUE) * 100
+
+clean_sheet_df <- data.frame(
+  Team = c("Argentina", "Spain"),
+  CS_Percentage = c(cs_argentina, cs_spain)
+)
+
+bp_cs <- barplot(
+  clean_sheet_df$CS_Percentage,
+  names.arg = clean_sheet_df$Team,
+  col = c("skyblue", "darkred"),
+  main = "Clean Sheet Percentage (%)",
+  ylab = "Percentage of Games (%)",
+  ylim = c(0, 100)
+)
+text(x = bp_cs, y = clean_sheet_df$CS_Percentage + 5, 
+     labels = paste0(round(clean_sheet_df$CS_Percentage, 1), "%"),
+     font = 2)
+```
+
+Spain demonstrates world-class defensive organization, recording clean sheets in the vast majority of their tournament fixtures.\
+Argentina traded defensive firmness for overwhelming offensive firepower, keeping clean sheets far less frequently and accepting open, transitional games.
+
+```{r}
+#Q6. Win Quality Breakdown
+win_quality_arg <- table(ifelse(Goals_Scored_Argentina$Goals_Conceded==0,
+                                "Shutout Win", "Conceding Win"))
+win_quality_spn <- table(ifelse(Goals_Scored_Spain$Goals_Conceded==0, 
+                                "Shutout Win", "Conceding Win"))
+
+win_quality_matrix <- rbind(Argentina = win_quality_arg,
+                            Spain = win_quality_spn)
+
+barplot(
+  t(win_quality_matrix),
+  beside = TRUE,
+  col = c("coral", "lightseagreen"),
+  main = "Victory Profile: Shutout Wins vs Conceding Wins",
+  ylab = "Number of Matches",
+  ylim = c(0, 7)
+)
+legend("topright", legend = colnames(win_quality_matrix),
+       fill = c("coral", "lightseagreen"))
+```
+
+Highlights defensive control during victories: Spain wins primarily through shutout performances, whereas Argentina wins frequently in high-scoring, open matches.
+
+```{r}
+#Q7. Venue Analysis: Goals Scored segregated by Host City
+venue_arg <- Goals_Scored_Argentina |>
+  group_by(Location) |>
+  summarise(Avg_Goals = mean(Goals_Scored),
+            Matches = n(), Team = "Argentina")
+
+venue_spn <- Goals_Scored_Spain |>
+  group_by(Location) |>
+  summarise(Avg_Goals = mean(Goals_Scored),
+            Matches = n(), Team = "Spain")
+
+venue_combined <- bind_rows(venue_arg, venue_spn)
+
+dotchart(venue_combined$Avg_Goals,
+         labels = paste(venue_combined$Team, "-",
+                        venue_combined$Location),
+         color = ifelse(venue_combined$Team == "Argentina",
+                        "skyblue", "darkred"),
+         pch = 19, main = "Average Goals by Venue Location",
+         xlab = "Average Goals")
+```
+
+Evaluates whether stadium altitude, climate, or pitch conditions in specific host cities (e.g., Dallas vs. Miami vs. Atlanta) impacted offensive output.\
+Highlights potential venue preference where high offensive bursts occurred (e.g., Spain's peak offensive output in Dallas).
+
+```{r}
+#Q8.Individual Player Contribution (Lionel Messi Impact)
+
+total_goals_arg <- sum(Goals_Scored_Argentina$Goals_Scored)
+
+messi_goals <- 5 
+other_arg_goals <- total_goals_arg - messi_goals
+
+messi_share <- c("Lionel Messi" = messi_goals,
+                 "Rest of Squad" = other_arg_goals)
+
+# Donut / Pie chart visualization
+pie(
+  messi_share,
+  col = c("gold", "skyblue"),
+  main = "Argentina Total Goals Contribution: Messi vs Squad",
+  init.angle = 90
+)
+```
+
+Argentina'sattack exhibits high star-player centrality, with Messi contributing directly to roughly 26%-30% of all total team goals scored during the tournament.\
+Evaluates team dependency on a single primary playmaker versus spread-out goalscoring.
+
+```{r}
+# Q9. Goalscorer Diversity Score
+unique_scorers_arg <- length(c("Messi", "Álvarez",
+                               "Martínez", "Fernández", 
+                               "Romero", "Paredes"))
+unique_scorers_spn <- length(c("Torres", "Yamal",
+                               "Olmo", "Williams", 
+                               "Cubarsí", "Zubimendi",
+                               "Laporte", "Oyarzabal",
+                               "Porro"))
+
+scorer_diversity <- c("Argentina" = unique_scorers_arg,
+                      "Spain" = unique_scorers_spn)
+
+bp_div <- barplot(
+  scorer_diversity,
+  col = c("skyblue", "darkred"),
+  main = "Total Unique Goalscorers Across Squads",
+  ylab = "Number of Different Goalscorers",
+  ylim = c(0, 12)
+)
+text(x = bp_div, y = scorer_diversity + 0.5,
+     labels = scorer_diversity, font = 2)
+```
+
+Spain maintained a pristine defensive record in 3 out of 4 knockout venues, conceding only 1 goal total across all elimination matches.\
+Argentina conceded consistently in every single knockout venue (1 to 2 goals per match), relying heavily on outscoring opposition rather than defensive clean sheets.
+
+```{r}
+#Q10. Goal Scoring Volatility & Spread (Boxplot Analysis)
+scoring_dist <- data.frame(
+  Goals = c(Goals_Scored_Argentina$Goals_Scored, Goals_Scored_Spain$Goals_Scored),
+  Team = factor(c(rep("Argentina", nrow(Goals_Scored_Argentina)), 
+                  rep("Spain", nrow(Goals_Scored_Spain))))
+)
+
+boxplot(
+  Goals ~ Team,
+  data = scoring_dist,
+  col = c("skyblue", "darkred"),
+  main = "Goal Scoring Volatility across Matches",
+  ylab = "Goals Scored per Match"
+)
+
+# Overlay mean values
+points(1:2, c(mean(Goals_Scored_Argentina$Goals_Scored), mean(Goals_Scored_Spain$Goals_Scored)), 
+       col = "yellow", pch = 18, cex = 2)
+```
+
+```{r}
+#Q11.Checking Clean Sheet
+cs_arg <-mean(Net_Goals_Scored_Argentina$Goals_Conceded==0)*100
+cs_spn <-mean(Net_Goals_Scored_Spain$Goals_Conceded==0)*100
+
+clean_sheets <- c(Argentina = cs_arg, Spain = cs_spn)
+bp <- barplot(
+  clean_sheets,
+  col = c("skyblue", "darkred"),
+  main = "Clean Sheet Percentage (%)",
+  ylab = "Clean Sheet %",
+  ylim = c(0, 100)
+)
+text(x = bp, y = clean_sheets + 5, 
+     labels = paste0(round(clean_sheets, 1), "%"),
+     font = 2)
+```
+
+```{r}
+#12. Simple Summary Conclusion
+cat("Summary:\n")
+cat("Spain Clean Sheet %:", round(cs_spn, 1), "%\n")
+cat("Argentina Clean Sheet %:", round(cs_arg, 1), "%\n")
+```
+
+Argentina scores more goals per game (\~2.71 vs \~1.86), but also concedes \~1.0 goal per game.\
+Spain keeps clean sheets in 85.7% of their matches compared to Argentina's 28.6%, giving Spain the stronger defensive edge to win tight matches.
+
+While Argentina boasts a higher goal average (2.71 vs. 1.86), they concede an average of 1.0 goal per match, requiring extra time in multiple knockout games. Spain's defense concedes just 0.14 goals per match while keeping clean sheets in 6 out of 7 fixtures.
+
+Argentina relies heavily on Lionel Messi's direct involvements. Spain's distribution across 9 different goalscorers makes them significantly harder to isolate defensively, giving spain a statistical edge (Win Probability) in a Neutral venue Match up
+
+```{r}
+# Final Summary Matrix
+final_summary <- data.frame(
+  Metric = c("Avg Goals Scored", "Avg Goals Conceded", "Clean Sheet %", "Unique Scorers"),
+  Argentina = c("2.71", "1.00", "28.6%", "6"),
+  Spain = c("1.86", "0.14", "85.7%", "9"),
+  Advantage = c("Argentina (Offense)", "Spain (Defense)", "Spain (Control)", "Spain (Depth)")
+)
+
+print(final_summary)
+```
